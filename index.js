@@ -6,8 +6,10 @@ const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY)
 
 const app = express()
 const port = process.env.PORT || 5000
+
 // middle ware
 app.use(cors())
+
 app.use(express.json())
 
 
@@ -23,6 +25,9 @@ const client = new MongoClient(uri, {
     }
 });
 
+
+
+
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
@@ -31,6 +36,8 @@ async function run() {
         const userCollection = client.db('PollingSurveyDb').collection('users')
         const surveyCollection = client.db('PollingSurveyDb').collection('survey')
         const commentCollection = client.db('PollingSurveyDb').collection('comment')
+        const reportCollection = client.db('PollingSurveyDb').collection('reports')
+        const answerCollection = client.db('PollingSurveyDb').collection('answers')
 
 
 
@@ -43,6 +50,21 @@ async function run() {
             res.send({ token: token })
         })
         // _______________
+        // answer collections
+        app.post('/user-vote', async (req, res) => {
+            const surveyQNA = req.body;
+            const result = await answerCollection.insertOne(surveyQNA)
+            res.send(result)
+        })
+
+
+        //reports
+        app.post('/reports', async (req, res) => {
+            const report = req.body;
+            const result = await reportCollection.insertOne(report)
+            res.send(result)
+        })
+
         //comments
         app.post('/comments', async (req, res) => {
             const createSurvey = req.body;
@@ -94,7 +116,7 @@ async function run() {
             const updateSurvey = req.body;
             console.log(updateSurvey)
             const filter = { _id: new ObjectId(id) }
-            const updateOne = {
+            const updateData = {
                 $set: {
                     category: updateSurvey.category,
                     details: updateSurvey.details,
@@ -103,10 +125,45 @@ async function run() {
                     price: updateSurvey.price
                 },
             }
-            const result = await surveyCollection.updateOne(filter, updateOne)
+            console.log(updateData)
+            const result = await surveyCollection.updateOne(filter, updateData)
             console.log(result)
             res.send(result)
         })
+
+        app.put('/api/v1/survey/:id', async (req, res) => {
+            try {
+                const { id } = req.params; // Corrected the object destructuring
+
+                const query = { _id: id };
+                console.log(query);
+
+                const info = req.body;
+                console.log(info);
+
+                const updateDoc = {
+                    $set: {
+                        likesCount: info.likesCount,
+                        email: info.email,
+                        name: info.displayName,
+                    },
+                };
+
+                console.log(updateDoc);
+
+                const result = await surveyCollection.updateOne(query, updateDoc);
+                console.log(result);
+
+                if (result.modifiedCount === 1) {
+                    res.json({ success: true });
+                } else {
+                    res.status(404).json({ success: false, error: 'Survey not found' });
+                }
+            } catch (error) {
+                console.error(error);
+                res.status(500).json({ success: false, error: 'Internal Server Error' });
+            }
+        });
 
 
         // caking admin TO DO***
