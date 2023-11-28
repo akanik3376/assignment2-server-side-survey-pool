@@ -38,6 +38,7 @@ async function run() {
         const commentCollection = client.db('PollingSurveyDb').collection('comment')
         const reportCollection = client.db('PollingSurveyDb').collection('reports')
         const answerCollection = client.db('PollingSurveyDb').collection('answers')
+        const paymentCollection = client.db('PollingSurveyDb').collection('payments')
 
 
 
@@ -53,7 +54,12 @@ async function run() {
         // answer collections
         app.post('/user-vote', async (req, res) => {
             const surveyQNA = req.body;
+            console.log(surveyQNA)
             const result = await answerCollection.insertOne(surveyQNA)
+            res.send(result)
+        })
+        app.get('/user-vote', async (req, res) => {
+            const result = await answerCollection.find().toArray()
             res.send(result)
         })
 
@@ -62,6 +68,12 @@ async function run() {
         app.post('/reports', async (req, res) => {
             const report = req.body;
             const result = await reportCollection.insertOne(report)
+            res.send(result)
+        })
+        //reports
+        app.get('/reports', async (req, res) => {
+            const report = req.body;
+            const result = await reportCollection.find().toArray()
             res.send(result)
         })
 
@@ -131,28 +143,23 @@ async function run() {
             res.send(result)
         })
 
-        app.put('/api/v1/survey/:id', async (req, res) => {
+        app.patch('/api/v1/survey/like/:id', async (req, res) => {
             try {
-                const { id } = req.params; // Corrected the object destructuring
+                const { id } = req.params;
 
-                const query = { _id: id };
-                console.log(query);
-
+                const query = { _id: new ObjectId(id) };
                 const info = req.body;
-                console.log(info);
-
+                console.log(info)
                 const updateDoc = {
-                    $set: {
-                        likesCount: info.likesCount,
-                        email: info.email,
-                        name: info.displayName,
+                    $inc: { likesCount: 1 },
+                    $push: {
+                        // likesCount: info.likesCount + 1,
+                        likerEmail: info.userEmail,
+                        likerName: info.userName,
                     },
                 };
-
-                console.log(updateDoc);
-
+                console.log(updateDoc)
                 const result = await surveyCollection.updateOne(query, updateDoc);
-                console.log(result);
 
                 if (result.modifiedCount === 1) {
                     res.json({ success: true });
@@ -254,6 +261,34 @@ async function run() {
 
 
         })
+
+        //  post :: payments and user data
+        app.post('/payments', async (req, res) => {
+            const payment = req.body;
+            // console.log(payment);
+            const result = await paymentCollection.insertOne(payment);
+            // console.log(payment.email);
+            const userEmail = payment.email
+            // console.log(userEmail,'ja payment korse tar email');
+
+            // update user role
+            const updateUserRole = await userCollection.updateOne(
+                { email: userEmail },
+                { $set: { role: 'pro-user' } }
+            )
+
+            res.send({ result, updateUserRole });
+        })
+
+        // get :: show payment history data 
+        // app.get("/api/v1/user-payment-history", async (req, res) => {
+        //     // console.log(req.user.email);
+        //     const result = await paymentCollection.find().toArray()
+        //     res.send(result)
+
+        // })
+
+
 
         // Send a ping to confirm a successful connection
         await client.db("admin").command({ ping: 1 });
