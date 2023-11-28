@@ -2,11 +2,12 @@ const express = require('express')
 const cors = require('cors')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config()
-const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY)
+// const stripe = require("stripe")(process.env.TOKEN_SECRET)
+// var jwt = require('jsonwebtoken');
 
 const app = express()
 const port = process.env.PORT || 5000
-
+// const stripe = require("stripe")(process.env.STRICK_SECRET_KEY)
 // middle ware
 app.use(cors())
 
@@ -44,12 +45,9 @@ async function run() {
 
         // ____________________
         //$$$$$$$$$$$$ jwt api $$$$$$$$$$$$$$
-        app.post('/jwt', async (req, res) => {
-            const user = req.body;
-            const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET,
-                { expiresIn: '2h' });
-            res.send({ token: token })
-        })
+
+
+
         // _______________
         // answer collections
         app.post('/user-vote', async (req, res) => {
@@ -134,7 +132,9 @@ async function run() {
                     details: updateSurvey.details,
                     image: updateSurvey.image,
                     name: updateSurvey.name,
-                    price: updateSurvey.price
+                    price: updateSurvey.price,
+                    status: updateSurvey.status,
+                    feedback: updateSurvey.feedback
                 },
             }
             console.log(updateData)
@@ -215,6 +215,22 @@ async function run() {
             const result = await userCollection.updateOne(filter, updatedDoc);
             res.send(result);
         });
+        // handle make Surveyor
+        app.get("/users/surveyor/:email", async (req, res) => {
+            const email = req.params.email
+            if (email !== req.decoded.email) {
+                return res.status(403).send({ massage: 'authorization access' })
+            }
+
+            const query = { email: email }
+            const user = await userCollection.findOne(query)
+
+            let surveyor = false;
+            if (user) {
+                surveyor = user.role === 'surveyor'
+            }
+            res.send({ surveyor })
+        });
 
         // user section start hare ####
         app.post('/users', async (req, res) => {
@@ -236,6 +252,7 @@ async function run() {
         //delete user by admin
         app.delete('/users/:id', async (req, res) => {
             const id = req.params.id
+
             const query = { _id: new ObjectId(id) }
             const result = await userCollection.deleteOne(query)
             res.send(result)
@@ -280,13 +297,13 @@ async function run() {
             res.send({ result, updateUserRole });
         })
 
-        // get :: show payment history data 
-        // app.get("/api/v1/user-payment-history", async (req, res) => {
-        //     // console.log(req.user.email);
-        //     const result = await paymentCollection.find().toArray()
-        //     res.send(result)
+        // get:: show payment history data
+        app.get("/payments", async (req, res) => {
+            // console.log(req.user.email);
+            const result = await paymentCollection.find().toArray()
+            res.send(result)
 
-        // })
+        })
 
 
 
