@@ -3,12 +3,18 @@ const cors = require('cors')
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 require('dotenv').config()
 // const stripe = require("stripe")(process.env.TOKEN_SECRET)
-// var jwt = require('jsonwebtoken');
+var jwt = require('jsonwebtoken');
 
 const app = express()
 const port = process.env.PORT || 5000
-// const stripe = require("stripe")(process.env.STRICK_SECRET_KEY)
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY)
 // middle ware
+const corsOptions = {
+    origin: ['http://localhost:5173'],
+    credentials: true,
+    optionSuccessStatus: 200,
+}
+
 app.use(cors())
 
 app.use(express.json())
@@ -36,7 +42,7 @@ async function run() {
         const testimonialCollection = client.db('PollingSurveyDb').collection('testimonial')
         const userCollection = client.db('PollingSurveyDb').collection('users')
         const surveyCollection = client.db('PollingSurveyDb').collection('survey')
-        const commentCollection = client.db('PollingSurveyDb').collection('comment')
+        const commentCollection = client.db('PollingSurveyDb').collection('comments')
         const reportCollection = client.db('PollingSurveyDb').collection('reports')
         const answerCollection = client.db('PollingSurveyDb').collection('answers')
         const paymentCollection = client.db('PollingSurveyDb').collection('payments')
@@ -45,8 +51,59 @@ async function run() {
 
         // ____________________
         //$$$$$$$$$$$$ jwt api $$$$$$$$$$$$$$
+        //$$$$$$$$$$$$ jwt api $$$$$$$$$$$$$$
+        app.post('/jwt', async (req, res) => {
+            const user = req.body;
+            const token = jwt.sign(user, process.env.TOKEN_SECRET,
+                { expiresIn: '2h' });
+            res.send({ token: token })
+        })
 
+        //jwt middleware token Verify
+        const verifyToken = (req, res, next) => {
+            // console.log('is side varifyToken', req.headers)
+            if (!req.headers.authorization) {
+                return res.status(401).send({ massage: 'authorization access' })
+            }
+            const token = req.headers.authorization.split(' ')[1]
+            // if (!token) {
+            //     return res.status(401).send({ massage: 'forbidden access' })
+            // }
+            jwt.verify(token, process.env.TOKEN_SECRET, (err, decoded) => {
+                if (err) {
+                    return res.status(401).send({ massage: 'authorization access' })
+                }
+                req.decoded = decoded
+                next()
+            })
 
+        }
+
+        // middleware token Verify then verify admin
+        const verifyAdmin = async (req, res, next) => {
+            const email = req.decoded.email;
+            const query = { email: email }
+            const user = await userCollection.findOne(query)
+
+            const isAdmin = user?.role === 'admin'
+            if (!isAdmin) {
+                return res.status(403).send({ massage: 'forbidden access' })
+            }
+            next()
+        }
+
+        // middleware token Verify then verify admin
+        const verifySurveyor = async (req, res, next) => {
+            const email = req.decoded.email;
+            const query = { email: email }
+            const user = await userCollection.findOne(query)
+
+            const isAdmin = user?.role === 'surveyor'
+            if (!isAdmin) {
+                return res.status(403).send({ massage: 'forbidden access' })
+            }
+            next()
+        }
 
         // _______________
         // answer collections
@@ -65,12 +122,20 @@ async function run() {
         //reports
         app.post('/reports', async (req, res) => {
             const report = req.body;
+            console.log(report)
             const result = await reportCollection.insertOne(report)
+            res.send(result)
+        })
+        app.get('/reports', async (req, res) => {
+            // const report = req.body;
+            // console.log(report)
+            const result = await reportCollection.find().toArray()
             res.send(result)
         })
         //reports
         app.get('/reports/:email', async (req, res) => {
             const email = req.params.email;
+            console.log(email)
             const query = { email: email }
             const result = await reportCollection.find(query).toArray()
             res.send(result)
@@ -94,7 +159,7 @@ async function run() {
         })
 
         // survey start hare **
-        app.post('/api/v1/survey', async (req, res) => {
+        app.post('/api/v1/survey', verifyToken, verifySurveyor, async (req, res) => {
             const createSurvey = req.body;
             console.log(createSurvey)
             const result = await surveyCollection.insertOne(createSurvey)
@@ -106,6 +171,16 @@ async function run() {
             const result = await surveyCollection.find().toArray()
             res.send(result)
         })
+
+        app.get("/api/v1/recent-surveys", async (req, res) => {
+            try {
+                const recentSurveys = await surveyCollection.find().sort({ _id: -1 }).limit(6).toArray();
+                res.send(recentSurveys);
+            } catch (error) {
+                console.error("Error fetching recent surveys:", error);
+                res.status(500).send("Internal Server Error");
+            }
+        });
 
         // survey start hare  get survey by id
         app.get('/api/v1/survey/:id', async (req, res) => {
@@ -174,8 +249,8 @@ async function run() {
         });
 
 
-        // caking admin TO DO***
-        app.get('/users/admin/:email', async (req, res) => {
+        // caking admin
+        app.get('/users/admin/:email', verifyToken, async (req, res) => {
             const email = req.params.email
             if (email !== req.decoded.email) {
                 return res.status(403).send({ massage: 'authorization access' })
@@ -217,7 +292,7 @@ async function run() {
             res.send(result);
         });
         // handle make Surveyor
-        app.get("/users/surveyor/:email", async (req, res) => {
+        app.get("/users/surveyor/:email", verifyToken, async (req, res) => {
             const email = req.params.email
             if (email !== req.decoded.email) {
                 return res.status(403).send({ massage: 'authorization access' })
@@ -245,8 +320,8 @@ async function run() {
             res.send(result)
         })
         //users get 
-        app.get('/users', async (req, res) => {
-
+        app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
+            // console.log(req.headers)
             const result = await userCollection.find().toArray()
             res.send(result)
         })
