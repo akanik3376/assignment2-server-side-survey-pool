@@ -69,9 +69,10 @@ async function run() {
             res.send(result)
         })
         //reports
-        app.get('/reports', async (req, res) => {
-            const report = req.body;
-            const result = await reportCollection.find().toArray()
+        app.get('/reports/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = { email: email }
+            const result = await reportCollection.find(query).toArray()
             res.send(result)
         })
 
