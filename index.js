@@ -10,7 +10,7 @@ const port = process.env.PORT || 5000
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY)
 // middle ware
 const corsOptions = {
-    origin: ['http://localhost:5173'],
+    origin: ['https://project-12-9f3fd.web.app'],
     credentials: true,
     optionSuccessStatus: 200,
 }
