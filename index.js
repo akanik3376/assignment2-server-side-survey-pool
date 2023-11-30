@@ -217,6 +217,7 @@ async function run() {
             const filter = { _id: new ObjectId(id) }
             const updateData = {
                 $set: {
+                    category: updateSurvey.category,
 
                     details: updateSurvey.details,
                     image: updateSurvey.image,
