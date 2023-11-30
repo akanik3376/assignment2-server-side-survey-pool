@@ -107,12 +107,24 @@ async function run() {
 
         // _______________
         // answer collections
+        let allVotes = []; // Initialize total votes as an array
+
         app.post('/user-vote', async (req, res) => {
             const surveyQNA = req.body;
-            console.log(surveyQNA)
-            const result = await answerCollection.insertOne(surveyQNA)
-            res.send(result)
-        })
+            console.log(surveyQNA);
+
+            // Assuming surveyQNA.vote is the field representing the user's vote
+            const userVote = surveyQNA.answer1;
+
+            // Update total votes
+            allVotes.push(userVote);
+
+            // Insert user's vote into the database (assuming you have a MongoDB collection named answerCollection)
+            const result = await answerCollection.insertOne({ userVote });
+
+            res.send(result);
+        });
+
         app.get('/user-vote', async (req, res) => {
             const result = await answerCollection.find().toArray()
             res.send(result)
@@ -169,6 +181,7 @@ async function run() {
         // survey start hare get all survey
         app.get('/api/v1/survey', async (req, res) => {
             const result = await surveyCollection.find().toArray()
+            console.log(result)
             res.send(result)
         })
 
@@ -204,7 +217,7 @@ async function run() {
             const filter = { _id: new ObjectId(id) }
             const updateData = {
                 $set: {
-                    category: updateSurvey.category,
+
                     details: updateSurvey.details,
                     image: updateSurvey.image,
                     name: updateSurvey.name,
@@ -320,7 +333,7 @@ async function run() {
             res.send(result)
         })
         //users get 
-        app.get('/users', verifyToken, verifyAdmin, async (req, res) => {
+        app.get('/users', async (req, res) => {
             // console.log(req.headers)
             const result = await userCollection.find().toArray()
             res.send(result)
@@ -356,7 +369,7 @@ async function run() {
         })
 
         //  post :: payments and user data
-        app.post('/payments', async (req, res) => {
+        app.post('/payments', verifyToken, verifyAdmin, async (req, res) => {
             const payment = req.body;
             // console.log(payment);
             const result = await paymentCollection.insertOne(payment);
